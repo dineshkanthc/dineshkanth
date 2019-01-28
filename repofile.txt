@@ -1,0 +1,107 @@
+1. Install and Configure Apache HTTPD web server:-
+
+System used:-
+CentOS 7.x
+
+
+# yum install httpd -y
+
+Create a test page
+# vi /var/www/html/index.html
+
+# systemctl start httpd
+# systemctl enable httpd
+
+Test the Apache HTTP server
+http://your.server.ip.address
+
+########################################################################################################################
+
+2. Set up a secure Apache HTTPS server with SSL:-
+
+Install SSL
+# yum install mod_ssl openssl
+
+Generate a self-signed certificate
+# openssl genrsa -out ca.key 2048
+# openssl req -new -key ca.key -out ca.csr
+# openssl x509 -req -days 365 -in ca.csr -signkey ca.key -out ca.crt
+
+# cp ca.crt /etc/pki/tls/certs/
+# cp ca.key /etc/pki/tls/private/
+# cp ca.csr /etc/pki/tls/private/
+
+Set up the certificates
+# vi /etc/httpd/conf.d/ssl.conf
+
+Find the section that begins with <VirtualHost _default_:443>. Uncomment the DocumentRoot and ServerName line and replace example.com with your server's IP address.
+
+DocumentRoot "/var/www/html"
+ServerName 192.168.1.42:443
+
+Next, find the SSLCertificateFile and SSLCertificateKeyFile lines and update them with the new location of the certificates.
+
+SSLEngine on
+SSLCertificateFile /etc/pki/tls/certs/ca.crt
+SSLCertificateKeyFile /etc/pki/tls/private/ca.key
+
+Restart httpd service
+# systemctl restart httpd
+
+Test the secure Apache HTTPS server
+https://your.server.ip.address
+
+##############################################################################################################################
+
+3. How To Use Apache as a Reverse Proxy with mod_proxy on CentOS 7
+
+* mod_proxy, the main proxy module Apache module for redirecting connections; it allows Apache to act as a gateway to the underlying application servers.
+* mod_proxy_http, which adds support for proxying HTTP connections.
+* mod_proxy_balancer and mod_lbmethod_byrequests, which add load balancing features for multiple backend servers.
+
+In case the modules are not enabled, you can enable them,
+
+LoadModule proxy_module modules/mod_proxy.so 
+LoadModule lbmethod_byrequests_module modules/mod_lbmethod_byrequests.so
+LoadModule proxy_balancer_module modules/mod_proxy_balancer.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+
+Creating Backend Test Servers:
+Apache Tomcate Server 1 = tomcat01
+Apache Tomcate Server 2 = tomcat02
+
+Modifying the Default Configuration to Enable Reverse Proxy
+
+<VirtualHost *:443>
+
+    ProxyPreserveHost On
+    ProxyRequests Off
+ 
+    ProxyPass / http://tomcat01:8080/
+    ProxyPassReverse / http://tomcat01:8080/
+
+</VirtualHost>
+
+
+# systemctl restart httpd
+
+
+4. Load Balancing Across Multiple Backend Servers
+
+<VirtualHost *:443>
+<Proxy balancer://mycluster>
+    BalancerMember http://tomcat01:8080/
+    BalancerMember http://tomcat02:8080/
+</Proxy>
+
+    ProxyPreserveHost On
+
+    ProxyPass / balancer://mycluster/
+    ProxyPassReverse / balancer://mycluster/
+</VirtualHost>
+
+# systemctl restart httpd
+
+Refreshing the page multiple times should show tomcat01 and tomcat02 web sites, meaning the reverse proxy worked and is load balancing between both servers.
+
+
